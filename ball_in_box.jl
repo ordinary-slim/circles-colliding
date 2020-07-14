@@ -215,7 +215,7 @@ end
 function collision_check(x_1, x_2, v_1, v_2, r_1, r_2)
 	return ((norm(x_1 - x_2) <= r_1 + r_2)&&(dot(v_2 - v_1, x_2 - x_1) < 0 )) #check if overlapped and getting closer
 end
-function many_circles_in_box(N, L, H, T, dt)
+function many_circles_in_box(N, L, H, T, dt, save_gif)
 	" first implementation with check of all balls for collisions "
 	number_iterations = ceil(Int64, T/dt + 1)
 	positions = Array{Array{Float64, 2}, 1}(undef, N)
@@ -223,7 +223,7 @@ function many_circles_in_box(N, L, H, T, dt)
 	accelerations = Array{Array{Float64, 2}, 1}(undef, N)
 	# initialize
 	@time initial_position, R, M = generate_circles(N, L, H)
-	initial_velocity = rand(Float64, (N, 2))
+	initial_velocity = randn(Float64, (N, 2))
 	for i=1:N
 		positions[i] = zeros(number_iterations, 2)
 		velocities[i] = zeros(number_iterations, 2)
@@ -234,12 +234,6 @@ function many_circles_in_box(N, L, H, T, dt)
 	# Visualization settings
 	circle_resolution = 201
 	theta = LinRange(0, 2*pi, circle_resolution)
-	circle_x = Array{Array{Float64, 1}, 1}(undef, N)
-	circle_y = Array{Array{Float64, 1}, 1}(undef, N)
-	for i=1:N
-		circle_x[i], circle_y[i] = zeros(number_iterations), zeros(number_iterations)
-		circle_x[i], circle_y[i] = R[i]*cos.(theta), R[i]*sin.(theta)
-	end
 	function ball_plot!(x, y)
 		return plot!(x, y, xlims = (0, L), ylims = (0, H), aspect_ratio =1, seriestype = [:shape], lw = 0, legend = false, framestyle = :none, grid = false, ticks = false, windowsize = (1200, 900), background_color_inside = :white, background_color_outside = :lightskyblue4, fillalpha = 0.6, linealpha = 0)
 	end
@@ -249,12 +243,13 @@ function many_circles_in_box(N, L, H, T, dt)
 	for i=1:N
 		if i==1
 			my_plot = plot()
-		end	
-		ball_plot!(positions[i][1, 1] .+ circle_x[i], positions[i][1, 2] .+ circle_y[i])
+		end
+		ball_plot!(positions[i][1, 1] .+ R[i]*cos.(theta), positions[i][1, 2] .+ R[i]*sin.(theta))
 	end
 	display(my_plot)
 	sleep(0.025)
-	while(t<T)
+	epsilon = 1e-7
+	while(t+epsilon<T)
 		if(t+dt>T)
 			dt = T - t
 		end
@@ -270,7 +265,7 @@ function many_circles_in_box(N, L, H, T, dt)
 			if i==1
 				my_plot = plot()
 			end
-			ball_plot!(positions[i][iteration_number, 1] .+ circle_x[i], positions[i][iteration_number, 2] .+ circle_y[i])
+			ball_plot!(positions[i][iteration_number, 1] .+ R[i]*cos.(theta), positions[i][iteration_number, 2] .+ R[i]*sin.(theta))
 		end
 		display(my_plot)
 		sleep(0.025)
@@ -300,8 +295,6 @@ function many_circles_in_box(N, L, H, T, dt)
 		# collision relation is "anti-reflexive" and symmetric
 		for i=1:(N-1)
 			for j=(i+1):N
-			#for j in setdiff(1:N, i)
-				#if (norm(positions[i][iteration_number + 1, :] - positions[j][iteration_number + 1, :]) <= R[i] + R[j])&&(dot(velocities[j][iteration_number + 1, :] - [v_x, velocities[i][iteration_number+1, 2]], positions[j][iteration_number + 1, :] - [positions[i][iteration_number+1, 1], y]) < 0 )
 				if collision_check([positions[i][iteration_number+1, 1], positions[i][iteration_number+1, 2]], positions[j][iteration_number+1, :], [velocities[i][iteration_number+1, 1], velocities[i][iteration_number+1, 2]], velocities[j][iteration_number+1, :], R[i], R[j])
 					print("Ball-ball collision !\n")
 					# Hypothesis : forces only along normal to contact plane
@@ -314,13 +307,19 @@ function many_circles_in_box(N, L, H, T, dt)
 					a_2n = 2*M[i]/((M[i] + M[j])*dt)*(v_1n - v_2n)
 					accelerations[i][iteration_number + 1, :] .+= a_1n*n
 					accelerations[j][iteration_number + 1, :] .+= a_2n*n
-					#accelerations[j][iteration_number + 1, 2] += a_2n*n[2]
-					#a_x += 2*M[j]/((M[i] + M[j])*dt)*(velocities[j][iteration_number+1, 1] - velocities[i][iteration_number+1, 1])
-					#a_y += 2*M[j]/((M[i] + M[j])*dt)*(velocities[j][iteration_number+1, 2] - velocities[i][iteration_number+1, 2])
 				end
 			end
-			#accelerations[i][iteration_number + 1, 1] = a_x
-			#accelerations[i][iteration_number + 1, 2] = a_y
 		end
+	end
+	if save_gif
+		anim = @animate for iteration_number=1:number_iterations
+			for i=1:N
+				if i==1
+					my_plot = plot()
+				end
+				ball_plot!(positions[i][iteration_number, 1] .+ R[i]*cos.(theta), positions[i][iteration_number, 2] .+ R[i]*sin.(theta))
+			end
+		end
+		gif(anim, "anim_fps15.gif", fps = 15)
 	end
 end
