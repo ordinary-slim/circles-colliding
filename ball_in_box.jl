@@ -276,6 +276,7 @@ function many_circles_in_box(N, L, H, T, dt)
 		sleep(0.025)
 
 		# check for collisions
+		# check for wall-ball collisions
 		for i=1:N
 			r = R[i]
 			m = M[i]
@@ -286,37 +287,36 @@ function many_circles_in_box(N, L, H, T, dt)
 			#a_x = 0
 			#a_y = 0
 			# wall collisions : elastic
-			if ((x<r)&&(v_x <0) || ((L-x)<r)&&v_x>0) # side wall collision
+			if ((positions[i][iteration_number+1, 1]<R[i])&&(velocities[i][iteration_number+1, 1] <0) || ((L-positions[i][iteration_number+1, 1])<R[i])&&velocities[i][iteration_number+1, 1]>0) # side wall collision
 				print("Wall-ball collision !\n")
-				accelerations[i][iteration_number + 1, 1] += -2*v_x/dt # perfectly elastic shock, impulse calculation
+				accelerations[i][iteration_number + 1, 1] += -2*velocities[i][iteration_number+1, 1]/dt # perfectly elastic shock, impulse calculation
 			end
-			if ((y<r)&&(v_y <0) || ((L-y)<r)&&v_y>0) # roof/ground collision
+			if ((positions[i][iteration_number+1, 2]<R[i])&&(velocities[i][iteration_number+1, 2] <0) || ((L-positions[i][iteration_number+1, 2])<R[i])&&velocities[i][iteration_number+1, 2]>0) # roof/ground collision
 				print("Wall-ball collision !\n")
-				accelerations[i][iteration_number + 1, 2] += -2*v_y/dt # perfectly elastic shock, impulse calculation
+				accelerations[i][iteration_number + 1, 2] += -2*velocities[i][iteration_number+1, 2]/dt # perfectly elastic shock, impulse calculation
 			end
-			# ball-ball collision : elastic
-			# initialize collision matrix as boolean array
-			collision_matrix = falses((N, N))
-			# collision relation is "anti-reflexive" and symmetric
-			#for j=(i+1):(N-1)
-			for j=1:N
-				#if (norm(positions[i][iteration_number + 1, :] - positions[j][iteration_number + 1, :]) <= r + R[j])&&(dot(velocities[j][iteration_number + 1, :] - [v_x, v_y], positions[j][iteration_number + 1, :] - [x, y]) < 0 )
-				if collision_check([x, y], positions[j][iteration_number+1, :], [v_x, v_y], velocities[j][iteration_number+1, :], r, R[j])
+		end
+		# check for ball-ball collision
+		# collision relation is "anti-reflexive" and symmetric
+		for i=1:(N-1)
+			for j=(i+1):N
+			#for j in setdiff(1:N, i)
+				#if (norm(positions[i][iteration_number + 1, :] - positions[j][iteration_number + 1, :]) <= R[i] + R[j])&&(dot(velocities[j][iteration_number + 1, :] - [v_x, velocities[i][iteration_number+1, 2]], positions[j][iteration_number + 1, :] - [positions[i][iteration_number+1, 1], y]) < 0 )
+				if collision_check([positions[i][iteration_number+1, 1], positions[i][iteration_number+1, 2]], positions[j][iteration_number+1, :], [velocities[i][iteration_number+1, 1], velocities[i][iteration_number+1, 2]], velocities[j][iteration_number+1, :], R[i], R[j])
 					print("Ball-ball collision !\n")
 					# Hypothesis : forces only along normal to contact plane
-					x_2 = positions[j][iteration_number+1, :]
 					x_1 = positions[i][iteration_number+1, :]
+					x_2 = positions[j][iteration_number+1, :]
 					n = (x_2 - x_1)/norm(x_2 - x_1)
-					v_2n = dot(velocities[j][iteration_number+1, :], n)
 					v_1n = dot(velocities[i][iteration_number+1, :], n)
-					a_1n = 2*M[j]/((m + M[j])*dt)*(v_2n - v_1n)
-					a_2n = 2*m/((m + M[j])*dt)*(v_1n - v_2n)
-					accelerations[i][iteration_number + 1, 1] += a_1n*n[1]
-					accelerations[i][iteration_number + 1, 2] += a_1n*n[2]
-					#accelerations[j][iteration_number + 1, 1] += a_2n*n[1]
+					v_2n = dot(velocities[j][iteration_number+1, :], n)
+					a_1n = 2*M[j]/((M[i] + M[j])*dt)*(v_2n - v_1n)
+					a_2n = 2*M[i]/((M[i] + M[j])*dt)*(v_1n - v_2n)
+					accelerations[i][iteration_number + 1, :] .+= a_1n*n
+					accelerations[j][iteration_number + 1, :] .+= a_2n*n
 					#accelerations[j][iteration_number + 1, 2] += a_2n*n[2]
-					#a_x += 2*M[j]/((m + M[j])*dt)*(velocities[j][iteration_number+1, 1] - v_x)
-					#a_y += 2*M[j]/((m + M[j])*dt)*(velocities[j][iteration_number+1, 2] - v_y)
+					#a_x += 2*M[j]/((M[i] + M[j])*dt)*(velocities[j][iteration_number+1, 1] - velocities[i][iteration_number+1, 1])
+					#a_y += 2*M[j]/((M[i] + M[j])*dt)*(velocities[j][iteration_number+1, 2] - velocities[i][iteration_number+1, 2])
 				end
 			end
 			#accelerations[i][iteration_number + 1, 1] = a_x
