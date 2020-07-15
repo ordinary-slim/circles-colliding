@@ -25,4 +25,6 @@ This code plots in real time and can handle up to 25 circles relatively smoothly
 ![](24FPS_example.gif)
 
 ### Improvements
-The main aspect that can be improved on is the collision check: right now, they are done without taking into account much information. The common approach is to set a grid with a grid size sufficiently big, and only test for neighbouring grid cells.
+1. The main aspect that can be improved on is the collision check: right now, they are done without taking into account much information. The common approach is to set a grid with a grid size sufficiently big, and only test for neighbouring grid cells.
+2. Add ellipses as shape.
+3. Add rotational DOF
