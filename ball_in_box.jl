@@ -212,10 +212,51 @@ function generate_circles(N, L, H)
 	end
 	return centers, radii, masses
 end
-function collision_check(x_1, x_2, v_1, v_2, r_1, r_2)
-	return ((norm(x_1 - x_2) <= r_1 + r_2)&&(dot(v_2 - v_1, x_2 - x_1) < 0 )) #check if overlapped and getting closer
+
+function overlapping_check(x_1, x_2, r_1, r_2)
+	" circles "
+	return ((norm(x_1 - x_2) <= r_1 + r_2)) #check if overlapped
 end
-function many_circles_in_box(N, L, H, T, dt, save_gif)
+
+function getting_closer_check(x_1, x_2, v_1, v_2)
+	" general "
+	return (dot(v_2 - v_1, x_2 - x_1) < 0 ) #check if getting closer
+end
+
+function sweep_n_prune(endpoints, indices)
+	"
+	endpoints : 1D array of Floats that contains the endpoints of the objects' bounding boxes in unsorted order
+	indices : 1D array of Ints. indices[i] = index of object who endpoints[i] belongs to
+	sweep_n_prune is a BPC algorithm that detects overlaps between the bounding boxes
+	"
+	N = Int64(length(indices)/2)
+	# first sweep
+	p = sortperm(endpoints, alg=InsertionSort)
+	# second sweep
+	PCS = Set{Tuple{Int64, Int64}}()
+	AS = Set{Int64}()
+	is_active = zeros(Int8, N)
+	for object in indices[p]
+		if is_active[object] == 0
+			is_active[object] = 1
+			# for all already active items, possible collision
+			for active_object in AS
+				if active_object<object
+					push!(PCS, (active_object, object))
+				else
+					push!(PCS, (object, active_object))
+				end
+			end
+			push!(AS, object)
+		else
+			is_active[object] = 0
+			setdiff!(AS, object)
+		end
+	end
+	return p, PCS
+end
+
+function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
 	" first implementation with check of all balls for collisions "
 	number_iterations = ceil(Int64, T/dt + 1)
 	positions = Array{Array{Float64, 2}, 1}(undef, N)
@@ -224,12 +265,23 @@ function many_circles_in_box(N, L, H, T, dt, save_gif)
 	# initialize
 	@time initial_position, R, M = generate_circles(N, L, H)
 	initial_velocity = randn(Float64, (N, 2))
+	# endpoints and indices of bounding boxes
+	indices_x = repeat(1:N, inner=2)
+	indices_y = repeat(1:N, inner=2)
+	p_x = 1:2*N
+	p_y = 1:2*N
+	endpoints_x = zeros(2*N)
+	endpoints_y = zeros(2*N)
 	for i=1:N
 		positions[i] = zeros(number_iterations, 2)
 		velocities[i] = zeros(number_iterations, 2)
 		accelerations[i] = zeros(number_iterations, 2)
 		positions[i][1, :] = initial_position[i, :]
 		velocities[i][1, :] = initial_velocity[i, :]
+		endpoints_x[2*i-1] = initial_position[i, 1] - R[i]
+		endpoints_x[2*i] = initial_position[i, 1] + R[i]
+		endpoints_y[2*i-1] = initial_position[i, 2] - R[i]
+		endpoints_y[2*i] = initial_position[i, 2] + R[i]
 	end
 	# Visualization settings
 	circle_resolution = 201
@@ -265,6 +317,10 @@ function many_circles_in_box(N, L, H, T, dt, save_gif)
 			if i==1
 				my_plot = plot()
 			end
+			endpoints_x[2*i-1] = positions[i][iteration_number+1, 1] - R[i]
+			endpoints_x[2*i] = positions[i][iteration_number+1, 1] + R[i]
+			endpoints_y[2*i-1] = positions[i][iteration_number+1, 2] - R[i]
+			endpoints_y[2*i] = positions[i][iteration_number+1, 2] + R[i]
 			ball_plot!(positions[i][iteration_number, 1] .+ R[i]*cos.(theta), positions[i][iteration_number, 2] .+ R[i]*sin.(theta))
 		end
 		display(my_plot)
@@ -283,33 +339,66 @@ function many_circles_in_box(N, L, H, T, dt, save_gif)
 			#a_y = 0
 			# wall collisions : elastic
 			if ((positions[i][iteration_number+1, 1]<R[i])&&(velocities[i][iteration_number+1, 1] <0) || ((L-positions[i][iteration_number+1, 1])<R[i])&&velocities[i][iteration_number+1, 1]>0) # side wall collision
-				print("Wall-ball collision !\n")
+				if verbose
+					print("Wall-ball collision !\n")
+				end
 				accelerations[i][iteration_number + 1, 1] += -2*velocities[i][iteration_number+1, 1]/dt # perfectly elastic shock, impulse calculation
 			end
 			if ((positions[i][iteration_number+1, 2]<R[i])&&(velocities[i][iteration_number+1, 2] <0) || ((L-positions[i][iteration_number+1, 2])<R[i])&&velocities[i][iteration_number+1, 2]>0) # roof/ground collision
-				print("Wall-ball collision !\n")
+				if verbose
+					print("Wall-ball collision !\n")
+				end
 				accelerations[i][iteration_number + 1, 2] += -2*velocities[i][iteration_number+1, 2]/dt # perfectly elastic shock, impulse calculation
 			end
 		end
 		# check for ball-ball collision
 		# collision relation is "anti-reflexive" and symmetric
-		for i=1:(N-1)
-			for j=(i+1):N
-				if collision_check([positions[i][iteration_number+1, 1], positions[i][iteration_number+1, 2]], positions[j][iteration_number+1, :], [velocities[i][iteration_number+1, 1], velocities[i][iteration_number+1, 2]], velocities[j][iteration_number+1, :], R[i], R[j])
-					print("Ball-ball collision !\n")
-					# Hypothesis : forces only along normal to contact plane
-					x_1 = positions[i][iteration_number+1, :]
-					x_2 = positions[j][iteration_number+1, :]
-					n = (x_2 - x_1)/norm(x_2 - x_1)
-					v_1n = dot(velocities[i][iteration_number+1, :], n)
-					v_2n = dot(velocities[j][iteration_number+1, :], n)
-					a_1n = 2*M[j]/((M[i] + M[j])*dt)*(v_2n - v_1n)
-					a_2n = 2*M[i]/((M[i] + M[j])*dt)*(v_1n - v_2n)
-					accelerations[i][iteration_number + 1, :] .+= a_1n*n
-					accelerations[j][iteration_number + 1, :] .+= a_2n*n
+		relative_p_x, PCS_x = sweep_n_prune(endpoints_x[p_x], indices_x[p_x])
+		relative_p_y, PCS_y = sweep_n_prune(endpoints_y[p_y], indices_y[p_y])
+		p_x = p_x[relative_p_x]
+		p_y = p_y[relative_p_y]
+		PCS = intersect(PCS_x, PCS_y)
+		for pair in PCS
+			i = pair[1]
+			j = pair[2]
+			overlapped = overlapping_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], R[i], R[j])
+			getting_closer = getting_closer_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], velocities[i][iteration_number+1, :], velocities[j][iteration_number+1, :])
+			if overlapped&&getting_closer
+				if verbose
+					print("Ball ", i, " and ball ", j, " just collided !\n")
 				end
+				# Hypothesis : forces only along normal to contact plane
+				x_1 = positions[i][iteration_number+1, :]
+				x_2 = positions[j][iteration_number+1, :]
+				n = (x_2 - x_1)/norm(x_2 - x_1)
+				v_1n = dot(velocities[i][iteration_number+1, :], n)
+				v_2n = dot(velocities[j][iteration_number+1, :], n)
+				a_1n = 2*M[j]/((M[i] + M[j])*dt)*(v_2n - v_1n)
+				a_2n = 2*M[i]/((M[i] + M[j])*dt)*(v_1n - v_2n)
+				accelerations[i][iteration_number + 1, :] += a_1n*n
+				accelerations[j][iteration_number + 1, :] += a_2n*n
 			end
 		end
+
+		#for i=1:(N-1)
+			#for j=(i+1):N
+				#overlapped = overlapping_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], R[i], R[j])
+				#getting_closer = getting_closer_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], velocities[i][iteration_number+1, :], velocities[j][iteration_number+1, :])
+				#if (overlapped && getting_closer)
+					#print("Ball-ball collision !\n")
+					## Hypothesis : forces only along normal to contact plane
+					#x_1 = positions[i][iteration_number+1, :]
+					#x_2 = positions[j][iteration_number+1, :]
+					#n = (x_2 - x_1)/norm(x_2 - x_1)
+					#v_1n = dot(velocities[i][iteration_number+1, :], n)
+					#v_2n = dot(velocities[j][iteration_number+1, :], n)
+					#a_1n = 2*M[j]/((M[i] + M[j])*dt)*(v_2n - v_1n)
+					#a_2n = 2*M[i]/((M[i] + M[j])*dt)*(v_1n - v_2n)
+					#accelerations[i][iteration_number + 1, :] .+= a_1n*n
+					#accelerations[j][iteration_number + 1, :] .+= a_2n*n
+				#end
+			#end
+		#end
 	end
 	if save_gif
 		anim = @animate for iteration_number=1:number_iterations
