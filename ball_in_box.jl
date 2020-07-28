@@ -170,12 +170,13 @@ function single_circle_in_box(R, initial_position, initial_velocity, L, H, T, dt
 		end
 	end
 end
-function generate_circles(N, L, H)
+function generate_circles(N, L, H, rho)
 	" generate non-overlapping circles in box of width L and height H "
-	#upper_bound = sqrt(L*H/N)/4
+	" boxes are of homogeneneous material of density rho "
+	# upper and lower bounds for the radius
 	upper_bound = 1
 	lower_bound = sqrt(L*H/(2*N))/4
-	radii = lower_bound .+ upper_bound*rand(Float64, N)
+	radii = lower_bound .+ (upper_bound-lower_bound)*rand(Float64, N)
 	centers = rand(Float64, (N, 2))
 	centers[:, 1] *= L
 	centers[:, 2] *= H
@@ -204,16 +205,12 @@ function generate_circles(N, L, H)
 				end
 			end
 		end
-		if i==1
-			masses[i] = 1
-		else
-			masses[i] = radii[i]^2/radii[1]^2
-		end
+		masses[i] = rho*pi*radii[i]^2
 	end
 	return centers, radii, masses
 end
 
-function overlapping_check(x_1, x_2, r_1, r_2)
+function overlapping_circles_check(x_1, x_2, r_1, r_2)
 	" circles "
 	return ((norm(x_1 - x_2) <= r_1 + r_2)) #check if overlapped
 end
@@ -263,8 +260,11 @@ function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
 	velocities = Array{Array{Float64, 2}, 1}(undef, N)
 	accelerations = Array{Array{Float64, 2}, 1}(undef, N)
 	# initialize
-	@time initial_position, R, M = generate_circles(N, L, H)
+	rho = 1
+	@time initial_position, R, M = generate_circles(N, L, H, rho)
 	initial_velocity = randn(Float64, (N, 2))
+	kinetic_energy = sum(M.*(sum(initial_velocity.^2, dims=2).^0.5))
+	println("Total kinetic energy of system : ", 1000*kinetic_energy, " mJ")
 	# endpoints and indices of bounding boxes
 	indices_x = repeat(1:N, inner=2)
 	indices_y = repeat(1:N, inner=2)
@@ -361,7 +361,7 @@ function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
 		for pair in PCS
 			i = pair[1]
 			j = pair[2]
-			overlapped = overlapping_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], R[i], R[j])
+			overlapped = overlapping_circles_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], R[i], R[j])
 			getting_closer = getting_closer_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], velocities[i][iteration_number+1, :], velocities[j][iteration_number+1, :])
 			if overlapped&&getting_closer
 				if verbose
@@ -382,7 +382,7 @@ function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
 
 		#for i=1:(N-1)
 			#for j=(i+1):N
-				#overlapped = overlapping_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], R[i], R[j])
+				#overlapped = overlapping_circles_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], R[i], R[j])
 				#getting_closer = getting_closer_check(positions[i][iteration_number+1, :], positions[j][iteration_number+1, :], velocities[i][iteration_number+1, :], velocities[j][iteration_number+1, :])
 				#if (overlapped && getting_closer)
 					#print("Ball-ball collision !\n")
