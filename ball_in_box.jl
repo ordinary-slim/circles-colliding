@@ -225,32 +225,38 @@ function sweep_n_prune(endpoints, indices)
 	endpoints : 1D array of Floats that contains the endpoints of the objects' bounding boxes in unsorted order
 	indices : 1D array of Ints. indices[i] = index of object who endpoints[i] belongs to
 	sweep_n_prune is a BPC algorithm that detects overlaps between the bounding boxes
+	left and right wall correspond to indices 0 and N+1, where N is the number of objects
 	"
-	N = Int64(length(indices)/2)
+	M = Int64(length(indices)/2) # M = N+2
 	# first sweep
 	p = sortperm(endpoints, alg=InsertionSort)
 	# second sweep
 	PCS = Set{Tuple{Int64, Int64}}()
 	AS = Set{Int64}()
-	is_active = zeros(Int8, N)
+	LWCS = Set{Int64}()
+	RWCS = Set{Int64}()
+	is_active = zeros(Int8, M)
 	for object in indices[p]
-		if is_active[object] == 0
-			is_active[object] = 1
+		if is_active[object+1] == 0
+			is_active[object+1] = 1
 			# for all already active items, possible collision
 			for active_object in AS
-				if active_object<object
-					push!(PCS, (active_object, object))
+				i, j = min(object, active_object), max(object, active_object)
+				if i == 0
+					push!(LWCS, j)
+				elseif j == M-1
+					push!(RWCS, i)
 				else
-					push!(PCS, (object, active_object))
+					push!(PCS, (i, j))
 				end
 			end
 			push!(AS, object)
 		else
-			is_active[object] = 0
+			is_active[object+1] = 0
 			setdiff!(AS, object)
 		end
 	end
-	return p, PCS
+	return p, LWCS, RWCS, PCS
 end
 
 function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
@@ -266,22 +272,29 @@ function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
 	kinetic_energy = sum(M.*(sum(initial_velocity.^2, dims=2).^0.5))
 	println("Total kinetic energy of system : ", 1000*kinetic_energy, " mJ")
 	# endpoints and indices of bounding boxes
-	indices_x = repeat(1:N, inner=2)
-	indices_y = repeat(1:N, inner=2)
-	p_x = 1:2*N
-	p_y = 1:2*N
-	endpoints_x = zeros(2*N)
-	endpoints_y = zeros(2*N)
+	# indices 0 and N+1 correspond to left and right walls
+	# the endpoints and indices of object k rest at the indices 2*(k+1)-1 and 2*(k+1)
+	indices_x = repeat(0:N+1, inner=2)
+	indices_y = repeat(0:N+1, inner=2)
+	p_x = 1:2*(N+2)
+	p_y = 1:2*(N+2)
+	endpoints_x = zeros(2*N+4) # +4 for the two endpoints of ea wall
+	endpoints_y = zeros(2*N+4)
+	# wall endpoints
+	endpoints_x[1:2] = [-Inf, 0]
+	endpoints_x[2*N+3:2*N+4] = [L, +Inf]
+	endpoints_y[1:2] = [-Inf, 0]
+	endpoints_y[2*N+3:2*N+4] = [H, +Inf]
 	for i=1:N
 		positions[i] = zeros(number_iterations, 2)
 		velocities[i] = zeros(number_iterations, 2)
 		accelerations[i] = zeros(number_iterations, 2)
 		positions[i][1, :] = initial_position[i, :]
 		velocities[i][1, :] = initial_velocity[i, :]
-		endpoints_x[2*i-1] = initial_position[i, 1] - R[i]
-		endpoints_x[2*i] = initial_position[i, 1] + R[i]
-		endpoints_y[2*i-1] = initial_position[i, 2] - R[i]
-		endpoints_y[2*i] = initial_position[i, 2] + R[i]
+		endpoints_x[2*(i+1)-1] = initial_position[i, 1] - R[i]
+		endpoints_x[2*(i+1)] = initial_position[i, 1] + R[i]
+		endpoints_y[2*(i+1)-1] = initial_position[i, 2] - R[i]
+		endpoints_y[2*(i+1)] = initial_position[i, 2] + R[i]
 	end
 	# Visualization settings
 	circle_resolution = 201
@@ -317,47 +330,54 @@ function many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
 			if i==1
 				my_plot = plot()
 			end
-			endpoints_x[2*i-1] = positions[i][iteration_number+1, 1] - R[i]
-			endpoints_x[2*i] = positions[i][iteration_number+1, 1] + R[i]
-			endpoints_y[2*i-1] = positions[i][iteration_number+1, 2] - R[i]
-			endpoints_y[2*i] = positions[i][iteration_number+1, 2] + R[i]
+			endpoints_x[2*(i+1)-1] = positions[i][iteration_number+1, 1] - R[i]
+			endpoints_x[2*(i+1)] = positions[i][iteration_number+1, 1] + R[i]
+			endpoints_y[2*(i+1)-1] = positions[i][iteration_number+1, 2] - R[i]
+			endpoints_y[2*(i+1)] = positions[i][iteration_number+1, 2] + R[i]
 			ball_plot!(positions[i][iteration_number, 1] .+ R[i]*cos.(theta), positions[i][iteration_number, 2] .+ R[i]*sin.(theta))
 		end
 		display(my_plot)
 		sleep(0.025)
 
 		# check for collisions
-		# check for wall-ball collisions
-		for i=1:N
-			r = R[i]
-			m = M[i]
-			x = positions[i][iteration_number+1, 1]
-			y = positions[i][iteration_number+1, 2]
-			v_x = velocities[i][iteration_number+1, 1]
-			v_y = velocities[i][iteration_number+1, 2]
-			#a_x = 0
-			#a_y = 0
-			# wall collisions : elastic
-			if ((positions[i][iteration_number+1, 1]<R[i])&&(velocities[i][iteration_number+1, 1] <0) || ((L-positions[i][iteration_number+1, 1])<R[i])&&velocities[i][iteration_number+1, 1]>0) # side wall collision
-				if verbose
-					print("Wall-ball collision !\n")
-				end
-				accelerations[i][iteration_number + 1, 1] += -2*velocities[i][iteration_number+1, 1]/dt # perfectly elastic shock, impulse calculation
-			end
-			if ((positions[i][iteration_number+1, 2]<R[i])&&(velocities[i][iteration_number+1, 2] <0) || ((L-positions[i][iteration_number+1, 2])<R[i])&&velocities[i][iteration_number+1, 2]>0) # roof/ground collision
-				if verbose
-					print("Wall-ball collision !\n")
-				end
-				accelerations[i][iteration_number + 1, 2] += -2*velocities[i][iteration_number+1, 2]/dt # perfectly elastic shock, impulse calculation
-			end
-		end
-		# check for ball-ball collision
 		# collision relation is "anti-reflexive" and symmetric
-		relative_p_x, PCS_x = sweep_n_prune(endpoints_x[p_x], indices_x[p_x])
-		relative_p_y, PCS_y = sweep_n_prune(endpoints_y[p_y], indices_y[p_y])
+		relative_p_x, LWCS, RWCS, PCS_x = sweep_n_prune(endpoints_x[p_x], indices_x[p_x])
+		relative_p_y, BWCS, TWCS, PCS_y = sweep_n_prune(endpoints_y[p_y], indices_y[p_y])
 		p_x = p_x[relative_p_x]
 		p_y = p_y[relative_p_y]
 		PCS = intersect(PCS_x, PCS_y)
+		for i in LWCS #left wall collision set
+			if (velocities[i][iteration_number+1, 1] <0)
+				if verbose
+					print("Ball ", i, " collided with the left wall!\n")
+				end
+				accelerations[i][iteration_number + 1, 1] += -2*velocities[i][iteration_number+1, 1]/dt # perfectly elastic shock, impulse calculation
+			end
+		end
+		for i in RWCS #right wall collision set
+			if (velocities[i][iteration_number+1, 1] >0)
+				if verbose
+					print("Ball ", i, " collided with the right wall!\n")
+				end
+				accelerations[i][iteration_number + 1, 1] += -2*velocities[i][iteration_number+1, 1]/dt
+			end
+		end
+		for i in BWCS #bottom wall collision set
+			if (velocities[i][iteration_number+1, 2] <0)
+				if verbose
+					print("Ball ", i, " collided with the bottom wall!\n")
+				end
+				accelerations[i][iteration_number + 1, 2] += -2*velocities[i][iteration_number+1, 2]/dt
+			end
+		end
+		for i in TWCS #right wall collision set
+			if (velocities[i][iteration_number+1, 2] >0)
+				if verbose
+					print("Ball ", i, " collided with the top wall!\n")
+				end
+				accelerations[i][iteration_number + 1, 2] += -2*velocities[i][iteration_number+1, 2]/dt
+			end
+		end
 		for pair in PCS
 			i = pair[1]
 			j = pair[2]
