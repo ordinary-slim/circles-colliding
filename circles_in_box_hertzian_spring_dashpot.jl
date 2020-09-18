@@ -2,8 +2,8 @@ using Plots
 using LinearAlgebra
 include("helpers.jl")
 gr()
-function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif, verbose, initial_condition...)
-	" linear spring hysteresis in normal direction"
+function circles_in_box_hertzian_spring_dashpot(material, L, H, T, dt, save_gif, verbose, initial_condition...)
+	" hertzian spring with dashpot in normal direction"
 	" linear spring in tangent direction"
 	
 	#unpack dictionary of material properties
@@ -13,6 +13,7 @@ function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif
 	mu_roll = material["mu_roll"]
 	tangential_stiff_ratio = material["tangential_stiff_ratio"]
 	rho = material["rho"]
+	poisson = material["poisson"]
 
 	epsilon =  1e-5# for comparison with small numbers
 
@@ -219,27 +220,28 @@ function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif
 				end
 				relative_displacement = relative_pos - relative_pos_tm1
 				relative_displacement = Q'*relative_displacement#switch to local coordinates
+				rel_vel = Q'*rel_vel
+				overlap_dotted = -rel_vel[1]
 				# right now  we assume that R-overlap/2>0
 				distance2contactpoint_1 = (R[i]-overlap/2)
 				distance2contactpoint_2 = (R[j]-overlap/2)
 				relative_displacement[2] += -dTheta_2*distance2contactpoint_2 - dTheta_1*distance2contactpoint_1# add rolling to tangential displacement
 
-				# normal forces
-				# Linear spring with hysteresis along normal direction
+				# deformation history
 				normal_tm1, Fn_tm1, Ft_tm1 = collision_prev_iter[(i, j)]# t minus 1
-
-			        k_nli, k_nlj = E*2*R[i], E*2*R[j]# taking diameter as size of particle
-				k_nl = 1/(1/k_nli + 1/k_nlj)
-				k_nul = k_nl/restitution_coeff^2
 
 				Fn, Ft = 0.0, 0.0
 
-				loading = (dot(rel_vel, normal)<=0)
-				if loading
-					Fn += min(k_nl*overlap, Fn_tm1 - relative_displacement[1]*k_nul)
-				else
-					Fn += max(Fn_tm1 - relative_displacement[1]*k_nul, 0)
-				end
+				# hertzian spring normal direction
+				reduced_E = E/(2*(1 - poisson^2))
+				effective_R = 1/(1/R[i] + 1/R[j])
+				k_nl = 4/3*reduced_E*sqrt(effective_R)
+				Fn += k_nl*overlap^(3/2)
+				# hertzian dashpot normal direction : edem version
+				effective_mass = 1/(1/M[i] + 1/M[j])
+				beta = log(restitution_coeff)/sqrt(log(restitution_coeff)^2 + pi^2)
+				S_n = 2*reduced_E*sqrt(effective_R)
+				Fn += -2*sqrt(5/6)*beta*sqrt(S_n*effective_mass)*overlap^(1/4)*overlap_dotted
 
 				# tangential forces
 				# linear spring along tangential direction
@@ -333,7 +335,7 @@ function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif
 			end
 		end
 		frames_per_second = 60
-		name_o_file = string(N, "HysteresisSpringDashpot", frames_per_second, "fps.gif")
+		name_o_file = string(N, "HertzianSpringDashpot", frames_per_second, "fps.gif")
 		gif(anim, name_o_file, fps = 24)
 	end
 end

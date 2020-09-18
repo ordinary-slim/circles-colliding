@@ -2,8 +2,8 @@ using LinearAlgebra
 function generate_circles(N, L, H)
 	" generate non-overlapping circles in box of width L and height H "
 	# upper and lower bounds for the radius
-	upper_bound = 1
-	lower_bound = sqrt(L*H/(2*N))/4
+	upper_bound = 2*sqrt(L*H/(2*N))/3
+	lower_bound = sqrt(L*H/(2*N))/3
 	radii = lower_bound .+ (upper_bound-lower_bound)*rand(Float64, N)
 	centers = rand(Float64, (N, 2))
 	centers[:, 1] *= L

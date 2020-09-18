@@ -2,17 +2,60 @@ using LinearAlgebra
 using Plots
 gr()
 include("helpers.jl")
-function circles_in_box_perfectly_elastic(N, L, H, T, dt, save_gif, verbose)
-	" first implementation with check of all balls for collisions "
+function circles_in_box_perfectly_elastic(material, L, H, T, dt, save_gif, verbose, initial_condition...)
+	rho = material["rho"]
+	if isempty(initial_condition)
+		# initialize randomly
+		N = 25
+		initial_positions, R = generate_circles(N, L, H)
+		M = pi*R.^2*rho
+		rot_intertia = M.*(R.^2)/2# moments of intertia
+		initial_velocities = randn(Float64, (N, 2))
+		initial_accelerations = zeros(N, 2)
+		initial_angles = 2*pi*rand(Float64, N)
+		initial_omegas = 2*(2*pi*rand(Float64, N))
+		initial_angular_accelerations = zeros(N) 
+
+		# shearing test
+		#N = 2
+		#initial_positions = [0.4 0.35; 0.6 0.65]
+		#R = [0.15 0.15]
+		#M = pi*R.^2*rho
+		#rot_intertia = M.*(R.^2)/2# moments of intertia
+		#initial_velocities = [0 1.0; 0 -1.0]
+		#initial_accelerations = zeros(N, 2)
+		#initial_angles = [0.0 0.0]
+		#initial_omegas = [-5.0 -5.0]
+		#initial_angular_accelerations = zeros(N) 
+
+		# rolling test
+		#N = 2
+		#initial_positions = [0.4 0.5; 0.6 0.5]
+		#R = [0.15 0.15]
+		#M = pi*R.^2*rho
+		#rot_intertia = M.*(R.^2)/2# moments of intertia
+		#initial_velocities = [0.0 0.0; 0.0 0.0]
+		#initial_accelerations = zeros(N, 2)
+		#initial_angles = [0.0 pi]
+		#initial_omegas = [5.0 0.0]
+		#initial_angular_accelerations = zeros(N) 
+	else
+		initial_condition = initial_condition[1]
+		N = initial_condition[1]
+		R = initial_condition[2]
+		initial_positions, initial_velocities, initial_accelerations = initial_condition[3:5]
+		initial_angles, initial_omegas, initial_angular_accelerations = initial_condition[6:8]
+
+		M = pi*R.^2*rho
+		rot_intertia = M.*(R.^2)/2# moments of intertia
+	end
+
 	number_iterations = Int64(div(T, dt, RoundUp))
 	positions = Array{Array{Float64, 2}, 1}(undef, N)
 	velocities = Array{Array{Float64, 2}, 1}(undef, N)
 	accelerations = Array{Array{Float64, 2}, 1}(undef, N)
-	# initialize
-	rho = 1
-	initial_position, R, M = generate_circles(N, L, H, rho)
-	initial_velocity = randn(Float64, (N, 2))
-	kinetic_energy = sum(M.*sum(initial_velocity.^2, dims=2))/2
+
+	kinetic_energy = sum(M.*sum(initial_velocities.^2, dims=2))/2
 	println("Total kinetic energy of system : ", 1000*kinetic_energy, " mJ")
 	# endpoints and indices of bounding boxes
 	# indices 0 and N+1 correspond to left and right walls
@@ -33,12 +76,13 @@ function circles_in_box_perfectly_elastic(N, L, H, T, dt, save_gif, verbose)
 		positions[i] = zeros(number_iterations+1, 2)
 		velocities[i] = zeros(number_iterations+1, 2)
 		accelerations[i] = zeros(number_iterations+1, 2)
-		positions[i][1, :] = initial_position[i, :]
-		velocities[i][1, :] = initial_velocity[i, :]
-		endpoints_x[2*(i+1)-1] = initial_position[i, 1] - R[i]
-		endpoints_x[2*(i+1)] = initial_position[i, 1] + R[i]
-		endpoints_y[2*(i+1)-1] = initial_position[i, 2] - R[i]
-		endpoints_y[2*(i+1)] = initial_position[i, 2] + R[i]
+		positions[i][1, :] = initial_positions[i, :]
+		velocities[i][1, :] = initial_velocities[i, :]
+		accelerations[i][1, :] = initial_accelerations[i, :]
+		endpoints_x[2*(i+1)-1] = initial_positions[i, 1] - R[i]
+		endpoints_x[2*(i+1)] = initial_positions[i, 1] + R[i]
+		endpoints_y[2*(i+1)-1] = initial_positions[i, 2] - R[i]
+		endpoints_y[2*(i+1)] = initial_positions[i, 2] + R[i]
 	end
 
 
@@ -167,6 +211,8 @@ function circles_in_box_perfectly_elastic(N, L, H, T, dt, save_gif, verbose)
 				ball_plot!(positions[i][iteration_number, 1] .+ R[i]*cos.(theta), positions[i][iteration_number, 2] .+ R[i]*sin.(theta), L, H)
 			end
 		end
-		gif(anim, "anim_fps15.gif", fps = 15)
+		frames_per_second = 60
+		name_o_file = string(N, "PerfectlyElastic", frames_per_second, "fps.gif")
+		gif(anim, name_o_file, fps = 24)
 	end
 end

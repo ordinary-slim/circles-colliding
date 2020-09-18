@@ -2,8 +2,8 @@ using Plots
 using LinearAlgebra
 include("helpers.jl")
 gr()
-function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif, verbose, initial_condition...)
-	" linear spring hysteresis in normal direction"
+function circles_in_box_linear_spring_dashpot(material, L, H, T, dt, save_gif, verbose, initial_condition...)
+	" linear spring with dashpot in normal direction"
 	" linear spring in tangent direction"
 	
 	#unpack dictionary of material properties
@@ -219,27 +219,25 @@ function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif
 				end
 				relative_displacement = relative_pos - relative_pos_tm1
 				relative_displacement = Q'*relative_displacement#switch to local coordinates
+				rel_vel = Q'*rel_vel
+				overlap_dotted = -rel_vel[1]
 				# right now  we assume that R-overlap/2>0
 				distance2contactpoint_1 = (R[i]-overlap/2)
 				distance2contactpoint_2 = (R[j]-overlap/2)
 				relative_displacement[2] += -dTheta_2*distance2contactpoint_2 - dTheta_1*distance2contactpoint_1# add rolling to tangential displacement
 
-				# normal forces
-				# Linear spring with hysteresis along normal direction
+				# deformation history
 				normal_tm1, Fn_tm1, Ft_tm1 = collision_prev_iter[(i, j)]# t minus 1
 
-			        k_nli, k_nlj = E*2*R[i], E*2*R[j]# taking diameter as size of particle
-				k_nl = 1/(1/k_nli + 1/k_nlj)
-				k_nul = k_nl/restitution_coeff^2
-
 				Fn, Ft = 0.0, 0.0
-
-				loading = (dot(rel_vel, normal)<=0)
-				if loading
-					Fn += min(k_nl*overlap, Fn_tm1 - relative_displacement[1]*k_nul)
-				else
-					Fn += max(Fn_tm1 - relative_displacement[1]*k_nul, 0)
-				end
+				# linear spring normal direction
+			        k_nli, k_nlj = E*2*R[i], E*2*R[j]# taking as particle size the diameter
+				k_nl = 1/(1/k_nli + 1/k_nlj)
+				Fn += k_nl*overlap
+				# dashpot normal direction
+				effective_mass = 1/(1/M[i] + 1/M[j])
+				c = sqrt(4*effective_mass*k_nl/(1 + (pi/log(restitution_coeff))^2))# EDEM version
+				Fn += c*overlap_dotted
 
 				# tangential forces
 				# linear spring along tangential direction
@@ -333,7 +331,7 @@ function circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif
 			end
 		end
 		frames_per_second = 60
-		name_o_file = string(N, "HysteresisSpringDashpot", frames_per_second, "fps.gif")
+		name_o_file = string(N, "LinearSpringDashpot", frames_per_second, "fps.gif")
 		gif(anim, name_o_file, fps = 24)
 	end
 end
