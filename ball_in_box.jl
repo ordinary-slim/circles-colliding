@@ -267,6 +267,6 @@ function circles_in_box_linear_spring_hysteresis(N, L, H, T, dt, save_gif, verbo
 				ball_plot!(positions[i][iteration_number+1, 1], positions[i][iteration_number+1, 2], R[i], angles[i][iteration_number + 1], L, H)
 			end
 		end
-		gif(anim, "anim_fps15.gif", fps = 15)
+		gif(anim, "anim_fps15.gif", fps = 24)
 	end
 end
