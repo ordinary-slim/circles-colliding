@@ -11,7 +11,7 @@ In order to run this code you need Julia and the following Julia packages:
 
 ### Explanation
 
-The main function of the code is _many_circles_in_box_. It generates N random circles in a square of dimensions _L_ and _H_, initializes their velocity randomly and their acceleration to zero, and simulates their motion. The only modelled forces are contact forces.
+The code is organized into multiple files "circles_in_box_/contact model name/.jl". e.g. "circles_in_box_hertzian_spring_dashpot.jl". It generates N random circles in a square of dimensions _L_ and _H_, initializes their velocities randomly and their acceleration to zero, and simulates their motion. The only modelled forces are contact forces.
 
 The motivation was to implement a basic version of DEM and learn some more Julia. I decided to do it the same way as Cundall in his first paper in the sense that I restricted myself to 2D and circles. In order to not preoccupy myself with force modelling, this code only supports elastic collisions. With the assumption that the forces are normal to the contact planes, the impulses are solved for and the motion is updated:
 1. Update motion from Newton's second law, assuming constant acceleration during a time-step.
