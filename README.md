@@ -20,9 +20,9 @@ The motivation was to implement a basic version of DEM and learn some more Julia
 
 Although the elements are considered to be rigid solids, the _soft sphere_ approach is very common: up to a small overlap is allowed, from which elastic forces associated to deformation are calculated. This code allows small overlap although deformation forces are not taken into account: collisions are only checked for **after** updating the position.
 
-This code plots in real time and can handle up to 25 circles relatively smoothly. It can also save _gifs_, like this one:
+This code plots in real time and can handle up to 50 circles relatively smoothly. It can also save _gifs_, like this one:
 
-![](24FPS_example.gif)
+![](30LinearSpringDashpot24fps_spedupncropped.gif)
 
 ### Improvements
 1. Consider other BCP methods (space oriented like grids, or object oriented which builds a tree structure)
