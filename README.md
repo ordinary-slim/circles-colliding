@@ -22,7 +22,7 @@ Although the elements are considered to be rigid solids, the _soft sphere_ appro
 
 This code plots in real time and can handle up to 50 circles relatively smoothly. It can also save _gifs_, like this one:
 
-![](30LinearSpringDashpot24fps.gif)
+![](30LinearSpringDashpot24fps_spedupncropped.gif)
 
 ### Improvements
 1. Consider other BCP methods (space oriented like grids, or object oriented which builds a tree structure)
