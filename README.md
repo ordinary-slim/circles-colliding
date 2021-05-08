@@ -1,6 +1,6 @@
 # Circles colliding
 
-Circles doing ellastic collisions in a 2D box
+Circles colliding in a 2D box
 
 ### Prerequisites
 
