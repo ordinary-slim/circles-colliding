@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 include("helpers.jl")
 include("circles_in_box_perfectly_elastic.jl")
 include("circles_in_box_linear_spring_hysteresis.jl")
@@ -22,15 +21,15 @@ material["restitution_coeff"] = 0.8
 material["poisson"] = 0.25
 
 # run settings
-dt = 0.0002
+dt = 0.0001
 
 # random initial conditions. if not given, random anyway and N = 25 by default
 N = 30
 initial_position, R = generate_circles(N, L, H)
-initial_velocities = 5*randn(Float64, (N, 2))
+initial_velocities = 4*randn(Float64, (N, 2))
 initial_accelerations = zeros(N, 2)
 initial_angles = 2*pi*rand(Float64, N)
-initial_omegas = 36*(2*pi*rand(Float64, N))
+initial_omegas = 24*(2*pi*rand(Float64, N))
 initial_angular_accelerations = zeros(N) 
 initial_condition = (N, R, initial_position,
 		     initial_velocities, initial_accelerations,
@@ -44,23 +43,3 @@ verbose = false
 #circles_in_box_linear_spring_hysteresis(material, L, H, T, dt, save_gif, verbose, initial_condition)
 circles_in_box_linear_spring_dashpot(material, L, H, T, dt, save_gif, verbose, initial_condition)
 #circles_in_box_hertzian_spring_dashpot(material, L, H, T, dt, save_gif, verbose, initial_condition)
-=======
-include("ball_in_box.jl")
-println(@__FILE__)
-# domain description
-L = 1
-H = 1
-
-# run settings
-T = 1
-dt = 0.001
-
-# single particle simulation
-
-#initial_position = R .+ (1-2*R)*rand(1, 2)
-#initial_velocity = rand(1, 2)
-N = 150
-save_gif = false
-verbose = false
-many_circles_in_box(N, L, H, T, dt, save_gif, verbose)
->>>>>>> cac67b37dc08ec3dbf9110fac25ead1f46b6eb48

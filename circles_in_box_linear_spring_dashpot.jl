@@ -330,7 +330,7 @@ function circles_in_box_linear_spring_dashpot(material, L, H, T, dt, save_gif, v
 				ball_plot!(positions[i][iteration_number+1, 1], positions[i][iteration_number+1, 2], R[i], angles[i][iteration_number + 1], L, H)
 			end
 		end
-		frames_per_second = 24
+		frames_per_second = 72
 		name_o_file = string(N, "LinearSpringDashpot", frames_per_second, "fps.gif")
 		gif(anim, name_o_file, fps = frames_per_second)
 	end
