@@ -24,6 +24,6 @@ This code plots in real time and can handle up to 50 circles relatively smoothly
 
 ![](30LinearSpringDashpot24fps_spedupncropped.gif)
 
-### Improvements
+### To do
 1. Consider other BCP methods (space oriented like grids, or object oriented which builds a tree structure)
 2. Add ellipses as shape.
